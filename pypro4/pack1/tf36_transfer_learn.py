@@ -129,3 +129,46 @@ plt.legend()
 plt.ylabel('loss')
 
 plt.show()
+
+# 전이학습 - 파인 튜닝 (미세 조정)
+base_model.trainable = True # 학습동결 해제
+print('베이스 모델 레이어 수:', len(base_model.layers))
+fine_tune_at = 100
+
+# 154개 중 100개는 다시 동결하고  54개만 학습에 참여
+for layer in base_model.layers[:fine_tune_at]:
+    layer.trainable = False
+
+# 미세조정을 위해 learning_rate를 1/10로 조정
+model.compile(optimizer=tf.keras.optimizers.RMSprop(learning_rate=base_learning_rate/10),
+              loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+              metrics=['accuracy'])
+
+print(model.summary())
+
+# 파인튜닝 학습
+fine_tune_epochs = 10 # 사실은 횟수가 좀 더 많아야 함
+# total_epochs = initial_epochs + fine_tune_epochs
+total_epochs =3
+history_fine = model.fit(train_batches, epochs=total_epochs, validation_data=validation_batches) # initial_epoch = history.epoch[-1],
+
+# 시각화 
+acc += history_fine.history['accuracy']
+val_acc +=  history_fine.history['val_accuracy']
+loss += history_fine.history['loss']
+val_loss +=  history_fine.history['val_loss']
+
+plt.figure(figsize=(8,8))
+plt.subplot(2, 1, 1)
+plt.plot(acc, label='train acc')
+plt.plot(val_acc, label='val_acc')
+plt.legend()
+plt.ylabel('acc')
+
+plt.subplot(2, 1, 2)
+plt.plot(loss, label='train loss')
+plt.plot(val_loss, label='val_loss')
+plt.legend()
+plt.ylabel('loss')
+
+plt.show()
