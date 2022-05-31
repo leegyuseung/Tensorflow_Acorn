@@ -83,3 +83,66 @@ BATCH_SIZE = 64
 steps_per_epoch = example_per_epoch // BATCH_SIZE
 BUFFER_SIZE =  5000
 train_dataset = train_dataset.shuffle(BUFFER_SIZE).batch(BATCH_SIZE, drop_remainder=True)
+
+# model
+total_words = len(vocab)
+model = tf.keras.Sequential([
+    tf.keras.layers.Embedding(total_words, 100, input_length = seq_length),
+    tf.keras.layers.LSTM(units=100, return_sequences=True),        
+    tf.keras.layers.Dropout(rate=0.2),
+    tf.keras.layers.LSTM(units=100),
+    tf.keras.layers.Dense(units=total_words, activation='softmax')                        
+])
+
+model.compile(optimizer = 'adam',loss='sparse_categorical_crossentropy', metrics=['acc'])
+print(model.summary())
+
+# LambdaCallback : Lambda 함수를 작성하여 생성자에 넘기는 방식을 사용 
+# fit() 할 때 학습 도중 train data predict 되는 내용을 확인해 가며 작업하고 싶을 때 사용할 수도 있다.
+from keras.utils import pad_sequences
+
+def testmodel_func(epoch, logs):
+    if epoch %  5 != 0 and epoch != 49:
+        return
+
+    test_sentence = train_text[0]
+    next_words = 100
+    for _ in range(next_words):
+        test_text_X = test_sentence.split(' ')[-seq_length:]
+        test_text_X = np.array([word2idx[c] if c in word2idx else word2idx['UNK'] for c in test_text_X])
+        test_text_X = pad_sequences([test_text_X], maxlen=seq_length, padding='pre', value=word2idx['UNK'])
+        output_idx = np.argmax(model.predict(test_text_X)[0])
+        test_sentence += ' ' + idx2word[output_idx]
+    print()
+    print(test_sentence)
+    print()
+  
+testmodel_cb = tf.keras.callbacks.LambdaCallback(on_epoch_end=testmodel_func)
+
+# steps_per_epoch : epoch당 사용한  strep 수를 지정, 예를 들어 총 45개의 sample이 있고 배치사이즈가 3이라면 15 step으로 지정
+# 훈련데이터가 무한크기인 경우 유용하다.
+history = model.fit(train_dataset.repeat(), epochs=50, steps_per_epoch=steps_per_epoch, 
+                    callbacks=[testmodel_cb], verbose=2) # 무한반복
+
+print(history.history['loss'][-1])
+print(history.history['acc'][-1])
+model.save('nlp7model.hdf5')
+
+del model
+
+from keras.models import load_model
+model = load_model('nlp7model.hdf5')
+
+# 임의의 문장을 사용해 문자 생성
+test_sentence='수동이는 지리산에 구천이가 있다는 뜬소문을 생각 안 할래야 안  할 수가 없었다.'
+next_words = 500
+
+for _ in range(next_words):
+    test_text_X = test_sentence.split(' ')[-seq_length:]
+    test_text_X = np.array([word2idx[c] if c in word2idx else word2idx['UNK'] for c in test_text_X])
+    test_text_X = pad_sequences([test_text_X], maxlen=seq_length, padding='pre', value=word2idx['UNK'])
+    output_idx = np.argmax(model.predict(test_text_X)[0])
+    test_sentence += ' ' + idx2word[output_idx]
+print()
+print(test_sentence)
+print()
